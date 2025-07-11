@@ -1,0 +1,58 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Run this workflow every time you push to the main branch
+  push:
+    branches:
+      - main # Or 'master', depending on your default branch name
+
+# Set permissions for the workflow to read contents and write to pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build the project
+        run: |
+          # Create a 'build' directory for the output
+          mkdir build
+          # Compile the TSX file into a single JS file in the build directory
+          npx esbuild index.tsx --bundle --outfile=build/index.js --minify
+          # Copy the HTML and CSS files to the build directory
+          cp index.html build/index.html
+          cp index.css build/index.css
+          # Update the script tag in the HTML to point to the compiled JS file
+          sed -i 's/src="index.tsx"/src="index.js"/' build/index.html
+
+      - name: Upload production-ready build files
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './build'
+
+  deploy:
+    # This job depends on the 'build' job completing successfully
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curve War</title>
+    <link rel="stylesheet" href="index.css">
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <!-- Main Menu -->
+        <div id="menu-overlay" class="overlay">
+            <div class="menu-box">
+                <h1>Curve War</h1>
+                <p class="subtitle">Last player standing wins the round.</p>
+                <div class="settings">
+                     <div class="settings-grid">
+                        <div class="setting-item">
+                            <label for="player-count">Players</label>
+                            <div class="player-count-control">
+                                <button id="player-count-minus" aria-label="Decrease player count">-</button>
+                                <span id="player-count-value">2</span>
+                                <button id="player-count-plus" aria-label="Increase player count">+</button>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="powerups-toggle">Power-ups</label>
+                             <label class="switch">
+                                <input type="checkbox" id="powerups-toggle" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label for="obstacles-toggle">Obstacles & Boosters</label>
+                             <label class="switch">
+                                <input type="checkbox" id="obstacles-toggle" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                         <div class="setting-item">
+                            <label for="shooting-toggle">Shooting</label>
+                             <label class="switch">
+                                <input type="checkbox" id="shooting-toggle" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-item-full-width">
+                        <label>Game Area Size</label>
+                        <div class="segmented-control" id="game-size-control">
+                            <button data-value="small">Small</button>
+                            <button data-value="medium" class="active">Medium</button>
+                            <button data-value="large">Large</button>
+                        </div>
+                    </div>
+                    <div class="setting-item-full-width">
+                        <label>Game Length</label>
+                        <div class="segmented-control" id="game-length-control">
+                            <button data-value="short">Short</button>
+                            <button data-value="normal" class="active">Normal</button>
+                            <button data-value="marathon">Marathon</button>
+                        </div>
+                   </div>
+                </div>
+                 <div id="controls-info"></div>
+                 <div class="button-group">
+                    <button id="start-game-btn" class="action-btn">Start Game</button>
+                    <button id="how-to-play-btn" class="secondary-btn">How to Play</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- How to Play Screen -->
+        <div id="how-to-play-overlay" class="overlay hidden">
+            <div class="menu-box">
+                <h2>How to Play</h2>
+                <div class="how-to-play-content">
+                    <h3>Objective</h3>
+                    <p>Be the last player standing to win the round. <span id="how-to-play-winning-score"></span> You get points based on your survival rank in each round.</p>
+                    
+                    <h3>Game Mechanics</h3>
+                    <p><strong>Walls:</strong> Crashing into the outer walls or any player's trail will eliminate you.</p>
+                     <p><strong>Shooting:</strong> Each player gets <strong>2 shots</strong> per round. A successful hit on another player's head eliminates them instantly. Projectiles also carve a path through existing trails.</p>
+                    <p><strong>Booster Pads:</strong> These glowing pads will give you a strong, sharp push. Use them for quick maneuvers or to dodge danger! (Can be disabled in the menu)</p>
+
+                    <h3>Power-ups</h3>
+                    <ul class="powerup-list">
+                        <li><strong>⏩ Speed Boost:</strong> A temporary, controllable speed increase.</li>
+                        <li><strong>🛡️ Shield:</strong> Protects you from one projectile headshot. It does not protect against crashing into walls or trails.</li>
+                        <li><strong>〰️ Thin Line:</strong> Your trail becomes thinner for a short time, making it a smaller target.</li>
+                        <li><strong>👻 Ghost:</strong> Allows you to pass through player trails without crashing.</li>
+                    </ul>
+                </div>
+                <button id="close-how-to-play-btn" class="action-btn">Got It!</button>
+            </div>
+        </div>
+
+
+        <!-- Round/Game Over Screen -->
+        <div id="round-over-overlay" class="overlay hidden">
+             <div class="menu-box">
+                <h2 id="end-of-round-title"></h2>
+                <div id="scoreboard-final"></div>
+                <div class="button-group">
+                    <button id="play-again-btn" class="action-btn">Next Round</button>
+                    <button id="back-to-menu-btn" class="secondary-btn">Back to Menu</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Countdown Timer -->
+        <div id="countdown-overlay" class="overlay hidden">
+            <div class="countdown-content">
+                <h1 id="round-number-text"></h1>
+                <h2 id="countdown-title"></h2>
+                <span id="countdown-text">5</span>
+            </div>
+        </div>
+
+        <!-- In-Game HUD -->
+         <div id="hud" class="hidden">
+            <div id="scoreboard"></div>
+         </div>
+    </div>
+    <script type="module" src="index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
