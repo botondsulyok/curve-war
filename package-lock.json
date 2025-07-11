@@ -1,0 +1,14 @@
+{
+  "name": "curve-war",
+  "version": "1.0.0",
+  "description": "A local multiplayer game of skill and survival, inspired by classics like 'Zatacka' and 'Achtung, die Kurve!'.",
+  "private": true,
+  "scripts": {
+    "build": "esbuild index.tsx --bundle --outfile=index.js --minify"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2",
+    "typescript": "^5.4.5"
+  },
+  "license": "Apache-2.0"
+}
