@@ -21,7 +21,7 @@ const PROJECTILE_SIZE = 12; // Increased size
 const PROJECTILE_TRAIL_CLEAR_RADIUS = 10;
 const FIRE_COOLDOWN = 1000; //ms
 const INITIAL_AMMO = 2;
-const TOP_MARGIN = 60; // Safe zone at the top for the HUD
+const TOP_MARGIN = 75; // Safe zone at the top for the HUD
 
 // Classic Achtung-style trail gap constants
 const DRAW_TIME = 300; // frames to draw continuously
