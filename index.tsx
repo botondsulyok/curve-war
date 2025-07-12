@@ -4,8 +4,8 @@
  */
 
 // --- GAME CONFIGURATION ---
-const PLAYER_SPEED = 1.25; // Faster and more consistent
-const TURN_SPEED = 0.03;
+const PLAYER_SPEED = 1.25; // Base speed, will be scaled by TARGET_FPS
+const TURN_SPEED = 0.03; // Base turn speed
 const PLAYER_SIZE = 5;
 const POWERUP_SPAWN_INTERVAL = 7000; // ms
 const POWERUP_LIFESPAN = 10000; // ms, powerups disappear after this time
@@ -21,11 +21,12 @@ const PROJECTILE_SIZE = 12; // Increased size
 const PROJECTILE_TRAIL_CLEAR_RADIUS = 10;
 const FIRE_COOLDOWN = 1000; //ms
 const INITIAL_AMMO = 2;
-const TOP_MARGIN = 75; // Safe zone at the top for the HUD
+const TOP_MARGIN = 60; // Safe zone at the top for the HUD
 
-// Classic Achtung-style trail gap constants
-const DRAW_TIME = 300; // frames to draw continuously
-const GAP_TIME = 25;   // frames for the gap - consistent size
+// Classic Achtung-style trail gap constants, now time-based
+const TARGET_FPS = 120; // Game was tuned for 120hz, everything will be based on this
+const DRAW_DURATION_S = 300 / TARGET_FPS; // seconds to draw continuously
+const GAP_DURATION_S = 25 / TARGET_FPS;   // seconds for the gap - consistent size
 
 
 const PLAYER_COLORS = [
@@ -160,18 +161,17 @@ class Obstacle implements Rect {
 class BoosterPad implements Rect {
     x: number; y: number; width: number; height: number;
     angle: number;
-    life = 0; // for animation
+    life = 0; // for animation, now in seconds
     
     constructor(x: number, y: number, width: number, height: number, angle: number) {
         this.x = x; this.y = y; this.width = width; this.height = height; this.angle = angle;
     }
 
-    update() {
-        this.life++;
+    update(deltaTime: number) {
+        this.life += deltaTime;
     }
     
     draw(ctx: CanvasRenderingContext2D) {
-        this.update();
         ctx.save();
 
         // Translate and rotate context to the booster's position and angle
@@ -193,9 +193,10 @@ class BoosterPad implements Rect {
         ctx.shadowBlur = 0;
         ctx.lineWidth = 4;
         const chevronCount = 4;
+        const animationSpeed = TARGET_FPS / 20; // makes animation speed framerate-independent
 
         for (let i = 0; i < chevronCount; i++) {
-            let progress = ((this.life / 20) + (i / chevronCount)) % 1;
+            let progress = ((this.life * animationSpeed) + (i / chevronCount)) % 1;
             const alpha = Math.sin(progress * Math.PI); // fade in/out
             ctx.strokeStyle = `rgba(200, 225, 255, ${alpha * 0.8})`;
             ctx.beginPath();
@@ -221,15 +222,15 @@ class Player {
     isAlive = true;
     trailSegments: Point[][] = [];
     isDrawing = true;
-    timeToNextStateChange = 0;
+    timeToNextStateChange = 0; // now in seconds
     
     isShielded = false;
     speedMultiplier = 1;
     trailWidthMultiplier = 1;
     isGhost = false;
     
-    pushVx = 0;
-    pushVy = 0;
+    pushVx = 0; // now in pixels per second
+    pushVy = 0; // now in pixels per second
     lastBoostTime = 0;
     lastFireTime = 0;
     ammo = 0;
@@ -260,13 +261,15 @@ class Player {
         this.angle = rand(0, Math.PI * 2);
     }
 
-    updateSpawnSelection(keys: Set<string>, gameWidth: number, gameHeight: number) {
-        const speed = 2.5;
-        if(keys.has(this.controls.left)) this.angle -= TURN_SPEED * 1.5;
-        if(keys.has(this.controls.right)) this.angle += TURN_SPEED * 1.5;
+    updateSpawnSelection(keys: Set<string>, gameWidth: number, gameHeight: number, deltaTime: number) {
+        const speed = 2.5 * TARGET_FPS;
+        const turnSpeed = (TURN_SPEED * 1.5) * TARGET_FPS;
+        
+        if(keys.has(this.controls.left)) this.angle -= turnSpeed * deltaTime;
+        if(keys.has(this.controls.right)) this.angle += turnSpeed * deltaTime;
 
-        this.ghostX += Math.cos(this.angle) * speed;
-        this.ghostY += Math.sin(this.angle) * speed;
+        this.ghostX += Math.cos(this.angle) * speed * deltaTime;
+        this.ghostY += Math.sin(this.angle) * speed * deltaTime;
         
         const topBoundary = TOP_MARGIN * (gameHeight / window.innerHeight);
 
@@ -283,7 +286,7 @@ class Player {
         this.clearPowerUps();
         this.trailSegments = [[]];
         this.isDrawing = true;
-        this.timeToNextStateChange = DRAW_TIME;
+        this.timeToNextStateChange = DRAW_DURATION_S;
         this.ammo = INITIAL_AMMO;
     }
     
@@ -309,33 +312,37 @@ class Player {
         }
     }
 
-    move(keys: Set<string>, addBoosterParticles: () => void) {
+    move(keys: Set<string>, addBoosterParticles: () => void, deltaTime: number) {
         if (!this.isAlive) return;
 
-        const speed = PLAYER_SPEED * this.speedMultiplier;
-        const turnSpeed = TURN_SPEED;
+        const speed = (PLAYER_SPEED * TARGET_FPS) * this.speedMultiplier;
+        const turnSpeed = TURN_SPEED * TARGET_FPS;
 
-        if (keys.has(this.controls.left)) this.angle -= turnSpeed;
-        if (keys.has(this.controls.right)) this.angle += turnSpeed;
+        if (keys.has(this.controls.left)) this.angle -= turnSpeed * deltaTime;
+        if (keys.has(this.controls.right)) this.angle += turnSpeed * deltaTime;
 
-        this.x += Math.cos(this.angle) * speed + this.pushVx;
-        this.y += Math.sin(this.angle) * speed + this.pushVy;
+        const totalVx = Math.cos(this.angle) * speed + this.pushVx;
+        const totalVy = Math.sin(this.angle) * speed + this.pushVy;
 
-        this.pushVx *= 0.92; // Decay the push force
-        this.pushVy *= 0.92;
+        this.x += totalVx * deltaTime;
+        this.y += totalVy * deltaTime;
+        
+        const pushDecay = Math.pow(0.92, deltaTime * TARGET_FPS);
+        this.pushVx *= pushDecay;
+        this.pushVy *= pushDecay;
 
-        if (Math.hypot(this.pushVx, this.pushVy) > 0.5) {
+        if (Math.hypot(this.pushVx, this.pushVy) > 0.5 * TARGET_FPS) {
              if (Math.random() < 0.7) addBoosterParticles();
         }
         
-        this.timeToNextStateChange--;
+        this.timeToNextStateChange -= deltaTime;
         if (this.timeToNextStateChange <= 0) {
             this.isDrawing = !this.isDrawing;
             if (this.isDrawing) {
-                this.timeToNextStateChange = DRAW_TIME;
+                this.timeToNextStateChange = DRAW_DURATION_S;
                 this.trailSegments.push([]);
             } else {
-                this.timeToNextStateChange = GAP_TIME;
+                this.timeToNextStateChange = GAP_DURATION_S;
             }
         }
         
@@ -478,15 +485,15 @@ class Projectile {
     constructor(x: number, y: number, angle: number, owner: Player) {
         this.x = x;
         this.y = y;
-        this.vx = Math.cos(angle) * PROJECTILE_SPEED;
-        this.vy = Math.sin(angle) * PROJECTILE_SPEED;
+        this.vx = Math.cos(angle) * PROJECTILE_SPEED * TARGET_FPS;
+        this.vy = Math.sin(angle) * PROJECTILE_SPEED * TARGET_FPS;
         this.owner = owner;
         this.color = owner.color;
     }
 
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
+    update(deltaTime: number) {
+        this.x += this.vx * deltaTime;
+        this.y += this.vy * deltaTime;
     }
 
     draw(ctx: CanvasRenderingContext2D) {
@@ -611,7 +618,8 @@ class ZatackaGame {
     gameSize: GameSize = 'medium';
     
     animationFrameId: number | null = null;
-    
+    lastFrameTime = 0;
+
     constructor() {
         this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
         this.ctx = this.canvas.getContext('2d')!;
@@ -810,7 +818,8 @@ class ZatackaGame {
         this.updateScoreboard();
 
         if(this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-        this.gameLoop();
+        this.lastFrameTime = 0;
+        this.animationFrameId = requestAnimationFrame(this.gameLoop);
     }
 
     generateLevelElements() {
@@ -884,21 +893,29 @@ class ZatackaGame {
         }
     }
 
-    gameLoop = () => {
-        this.update();
+    gameLoop = (timestamp: number) => {
+        if (!this.lastFrameTime) {
+            this.lastFrameTime = timestamp;
+        }
+        // Clamp deltaTime to prevent huge jumps on tab resume
+        const deltaTime = Math.min(0.1, (timestamp - this.lastFrameTime) / 1000);
+        this.lastFrameTime = timestamp;
+
+        this.update(deltaTime);
         this.draw();
         this.animationFrameId = requestAnimationFrame(this.gameLoop);
     }
 
-    update() {
+    update(deltaTime: number) {
         const now = performance.now();
         
         // Update particles regardless of game state to let them fade out
         this.particles.forEach(p => p.update());
         this.particles = this.particles.filter(p => p.life > 0);
+        this.boosterPads.forEach(b => b.update(deltaTime));
 
         if (this.gameState === 'spawnSelection') {
-            this.players.forEach(p => p.updateSpawnSelection(this.keys, this.gameWidth, this.gameHeight));
+            this.players.forEach(p => p.updateSpawnSelection(this.keys, this.gameWidth, this.gameHeight, deltaTime));
             const elapsed = now - this.roundStartTime;
             if (elapsed >= SPAWN_SELECTION_DURATION) {
                 this.players.forEach(p => p.finalizeSpawn());
@@ -914,10 +931,10 @@ class ZatackaGame {
         } else if (this.gameState === 'playing') {
             this.handlePlayerInput();
             this.checkBoosterPads();
-            this.players.forEach(p => p.move(this.keys, () => this.createBoosterParticles(p)));
+            this.players.forEach(p => p.move(this.keys, () => this.createBoosterParticles(p), deltaTime));
             
             this.powerups.forEach(p => p.update());
-            this.projectiles.forEach(p => p.update());
+            this.projectiles.forEach(p => p.update(deltaTime));
 
             this.powerups = this.powerups.filter(p => now - p.spawnTime < POWERUP_LIFESPAN);
 
@@ -966,8 +983,8 @@ class ZatackaGame {
                 // Use isPointInRotatedRect for accurate collision with rotated pads
                 if (isPointInRotatedRect({ x: player.x, y: player.y }, pad)) {
                     // Apply push based on pad's angle
-                    const pushX = Math.cos(pad.angle) * BOOSTER_PUSH_FORCE;
-                    const pushY = Math.sin(pad.angle) * BOOSTER_PUSH_FORCE;
+                    const pushX = Math.cos(pad.angle) * BOOSTER_PUSH_FORCE * TARGET_FPS;
+                    const pushY = Math.sin(pad.angle) * BOOSTER_PUSH_FORCE * TARGET_FPS;
                     player.pushVx += pushX;
                     player.pushVy += pushY;
                     
