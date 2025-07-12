@@ -17,8 +17,8 @@ const BOOSTER_COOLDOWN = 200; // ms
 const SPAWN_PROTECTION_DURATION = 3000; // ms
 const SPAWN_SELECTION_DURATION = 5000; // 5 seconds to choose start
 const PROJECTILE_SPEED = 2;
-const PROJECTILE_SIZE = 12; // Increased size
-const PROJECTILE_TRAIL_CLEAR_RADIUS = 10;
+const PROJECTILE_SIZE = 20; // Increased size
+const PROJECTILE_TRAIL_CLEAR_RADIUS = 20;
 const FIRE_COOLDOWN = 1000; //ms
 const INITIAL_AMMO = 2;
 const TOP_MARGIN = 60; // Safe zone at the top for the HUD
@@ -814,7 +814,50 @@ class ZatackaGame {
         this.keys.clear();
         this.generateLevelElements();
 
-        this.players.forEach(p => p.prepareForSpawnSelection(this.gameWidth, this.gameHeight));
+        // BUG FIX: Ensure players get a valid, non-colliding initial spawn position.
+        const spawnPoints: Point[] = [];
+        this.players.forEach(p => {
+            let validSpawn = false;
+            let retries = 50; // Prevent infinite loops on crowded maps
+            while (!validSpawn && retries > 0) {
+                retries--;
+                p.prepareForSpawnSelection(this.gameWidth, this.gameHeight);
+
+                const ghostPosition = { x: p.ghostX, y: p.ghostY };
+                // Use a large radius for spawn clearance, matching the ghost selection visual
+                const spawnRadius = PLAYER_SIZE * 4;
+                const playerCircle = { ...ghostPosition, radius: spawnRadius };
+
+                let collision = false;
+                // Check against obstacles
+                for (const obs of this.obstacles) {
+                    if (isCircleCollidingWithRotatedRect(playerCircle, obs)) {
+                        collision = true;
+                        break;
+                    }
+                }
+                if (collision) continue;
+
+                // Check against other player spawn points
+                for (const sp of spawnPoints) {
+                    // Check if spawn areas overlap
+                    if (distSq(ghostPosition, sp) < (spawnRadius * 2) ** 2) {
+                        collision = true;
+                        break;
+                    }
+                }
+                if (collision) continue;
+
+                // If we are here, the spawn is valid
+                validSpawn = true;
+                spawnPoints.push(ghostPosition);
+            }
+            if (retries === 0) {
+                console.warn(`Could not find a clear spawn location for Player ${p.id}. Placing anyway.`);
+                spawnPoints.push({ x: p.ghostX, y: p.ghostY });
+            }
+        });
+        
         this.updateScoreboard();
 
         if(this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
@@ -863,9 +906,12 @@ class ZatackaGame {
                 newObstacle = new Obstacle(x, y, width, height, angle);
                 bounds = { x, y, width: aabbWidth, height: aabbHeight };
                 retries--;
-            } while (allElements.some(el => checkWithPadding(bounds, el)));
-            this.obstacles.push(newObstacle);
-            allElements.push(bounds);
+            } while (retries > 0 && allElements.some(el => checkWithPadding(bounds, el)));
+            
+            if (retries > 0) {
+                this.obstacles.push(newObstacle);
+                allElements.push(bounds);
+            }
         }
 
         for (let i = 0; i < scaledBoosterCount && retries > 0; i++) {
@@ -887,9 +933,12 @@ class ZatackaGame {
                 newBooster = new BoosterPad(x, y, width, height, angle);
                 bounds = { x, y, width: aabbWidth, height: aabbHeight };
                 retries--;
-            } while (allElements.some(el => checkWithPadding(bounds, el)));
-            this.boosterPads.push(newBooster);
-            allElements.push(bounds);
+            } while (retries > 0 && allElements.some(el => checkWithPadding(bounds, el)));
+
+            if (retries > 0) {
+                this.boosterPads.push(newBooster);
+                allElements.push(bounds);
+            }
         }
     }
 
@@ -946,9 +995,9 @@ class ZatackaGame {
             this.checkCollisions();
             
             const alivePlayers = this.players.filter(p => p.isAlive);
+            // BUG FIX: Simplified round end condition. The second check was redundant
+            // as player count is always >= 2.
             if (this.players.length > 1 && alivePlayers.length <= 1) {
-                this.endRound();
-            } else if (this.players.length > 0 && alivePlayers.length === 0) {
                 this.endRound();
             }
         }
@@ -980,8 +1029,9 @@ class ZatackaGame {
             if (now - player.lastBoostTime < BOOSTER_COOLDOWN) continue;
 
             for (const pad of this.boosterPads) {
-                // Use isPointInRotatedRect for accurate collision with rotated pads
-                if (isPointInRotatedRect({ x: player.x, y: player.y }, pad)) {
+                // BUG FIX: Use circle collision for more accurate and fair pad activation.
+                const playerCircle = { x: player.x, y: player.y, radius: PLAYER_SIZE };
+                if (isCircleCollidingWithRotatedRect(playerCircle, pad)) {
                     // Apply push based on pad's angle
                     const pushX = Math.cos(pad.angle) * BOOSTER_PUSH_FORCE * TARGET_FPS;
                     const pushY = Math.sin(pad.angle) * BOOSTER_PUSH_FORCE * TARGET_FPS;
@@ -1043,6 +1093,15 @@ class ZatackaGame {
                     }
                 }
             }
+            
+            // BUG FIX: Sort the splits by segment index in descending order for each player.
+            // This prevents array index corruption when a player's trail is split multiple times.
+            trailsToSplit.sort((a, b) => {
+                if (a.player.id !== b.player.id) {
+                    return a.player.id - b.player.id; // Group by player for sanity, though not strictly necessary
+                }
+                return b.segmentIndex - a.segmentIndex; // Process higher indices first to avoid shifting lower ones
+            });
 
             for (const splitInfo of trailsToSplit) {
                 const { player, segmentIndex, splitIndices } = splitInfo;
