@@ -12,8 +12,10 @@ const POWERUP_LIFESPAN = 10000; // ms, powerups disappear after this time
 const POWERUP_DURATION = 8000; // ms
 const OBSTACLE_COUNT = 3; // Fewer obstacles
 const BOOSTER_COUNT = 2;
-const BOOSTER_PUSH_FORCE = 2.8; // Stronger push
-const BOOSTER_COOLDOWN = 200; // ms
+const BOOSTER_PUSH_FORCE = 5.0; // Stronger, single impulse push
+const BOOSTER_COOLDOWN = 500; // ms, longer cooldown to prevent re-boosting too quickly
+const BOOSTER_EFFECT_DURATION = 600; // ms, duration of the slide effect
+const BOOSTER_TURN_DAMPENING = 0.1; // at peak effect, player has 10% turn control
 const SPAWN_PROTECTION_DURATION = 3000; // ms
 const SPAWN_SELECTION_DURATION = 5000; // 5 seconds to choose start
 const PROJECTILE_SPEED = 2;
@@ -174,42 +176,68 @@ class BoosterPad implements Rect {
     draw(ctx: CanvasRenderingContext2D) {
         ctx.save();
 
-        // Translate and rotate context to the booster's position and angle
-        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        // Center of the pad, for rotation
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+
+        ctx.translate(cx, cy);
         ctx.rotate(this.angle);
 
-        // Draw the main pad body (un-rotated in local space)
-        const bodyX = -this.width / 2;
-        const bodyY = -this.height / 2;
-        ctx.fillStyle = `rgba(0, 122, 255, 0.2)`;
-        ctx.strokeStyle = `rgba(0, 122, 255, 0.7)`;
-        ctx.shadowColor = '#007aff';
-        ctx.shadowBlur = 20;
-        ctx.lineWidth = 2;
-        ctx.fillRect(bodyX, bodyY, this.width, this.height);
-        ctx.strokeRect(bodyX, bodyY, this.width, this.height);
+        const localX = -this.width / 2;
+        const localY = -this.height / 2;
 
-        // Animated chevrons, always moving along the pad's local x-axis (left to right)
-        ctx.shadowBlur = 0;
+        // --- Base Pad ---
+        ctx.shadowColor = '#00aaff';
+        ctx.shadowBlur = 25;
+        
+        // Gradient for depth
+        const gradient = ctx.createLinearGradient(localX, 0, localX + this.width, 0);
+        gradient.addColorStop(0, `rgba(0, 122, 255, 0.1)`);
+        gradient.addColorStop(0.5, `rgba(0, 122, 255, 0.4)`);
+        gradient.addColorStop(1, `rgba(0, 122, 255, 0.1)`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(localX, localY, this.width, this.height);
+        
+        // Border
+        ctx.strokeStyle = `rgba(0, 150, 255, 0.8)`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(localX, localY, this.width, this.height);
+
+        // --- Animated Chevrons ---
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#fff';
+        ctx.lineCap = 'round';
         ctx.lineWidth = 4;
-        const chevronCount = 4;
-        const animationSpeed = TARGET_FPS / 20; // makes animation speed framerate-independent
+        
+        const chevronCount = Math.floor(this.width / 40); // Number of chevrons based on width
+        const chevronSpacing = this.width / (chevronCount + 1);
+        const chevronSize = 10; // Height of the chevron point
+
+        // The animation is a wave of light moving across the chevrons
+        const animationSpeed = 2; // Slower, smoother wave
+        const waveProgress = (this.life * animationSpeed) % 2; // Loop from 0 to 2
 
         for (let i = 0; i < chevronCount; i++) {
-            let progress = ((this.life * animationSpeed) + (i / chevronCount)) % 1;
-            const alpha = Math.sin(progress * Math.PI); // fade in/out
-            ctx.strokeStyle = `rgba(200, 225, 255, ${alpha * 0.8})`;
+            const chevronCenterX = localX + chevronSpacing * (i + 1);
+            
+            // Calculate the chevron's normalized position (0 to 1)
+            const normalizedPos = (i + 1) / (chevronCount + 1);
+            
+            // Calculate brightness based on distance to the wave
+            const distToWave = Math.abs(normalizedPos - (waveProgress - 0.5));
+            // Use a gaussian-like falloff for a smooth glow
+            const brightness = Math.max(0, 1 - (distToWave / 0.5)**2);
+            
+            ctx.strokeStyle = `rgba(255, 255, 255, ${brightness * 0.9})`;
+
             ctx.beginPath();
-            
-            const chevronX = bodyX + this.width * progress;
-            const chevronTipX = chevronX + 5; // Pointing right (positive x-axis)
-            
-            ctx.moveTo(chevronX, bodyY + 5);
-            ctx.lineTo(chevronTipX, bodyY + this.height / 2);
-            ctx.lineTo(chevronX, bodyY + this.height - 5);
-            
+            // Draw a `>` shape
+            ctx.moveTo(chevronCenterX - chevronSize / 2, localY + 4);
+            ctx.lineTo(chevronCenterX + chevronSize / 2, localY + this.height / 2);
+            ctx.lineTo(chevronCenterX - chevronSize / 2, localY + this.height - 4);
             ctx.stroke();
         }
+        
         ctx.restore();
     }
 }
@@ -316,7 +344,18 @@ class Player {
         if (!this.isAlive) return;
 
         const speed = (PLAYER_SPEED * TARGET_FPS) * this.speedMultiplier;
-        const turnSpeed = TURN_SPEED * TARGET_FPS;
+        let turnSpeed = TURN_SPEED * TARGET_FPS;
+
+        // NEW: Dampen turning for a "slippery" booster effect
+        const now = performance.now();
+        const timeSinceBoost = now - this.lastBoostTime;
+        if (timeSinceBoost < BOOSTER_EFFECT_DURATION) {
+            // Interpolate from BOOSTER_TURN_DAMPENING to 1.0 over the effect duration.
+            // This creates a smooth transition from low control back to full control.
+            const effectProgress = timeSinceBoost / BOOSTER_EFFECT_DURATION; // 0 to 1
+            const dampeningFactor = BOOSTER_TURN_DAMPENING + (1 - BOOSTER_TURN_DAMPENING) * effectProgress;
+            turnSpeed *= dampeningFactor;
+        }
 
         if (keys.has(this.controls.left)) this.angle -= turnSpeed * deltaTime;
         if (keys.has(this.controls.right)) this.angle += turnSpeed * deltaTime;
@@ -580,6 +619,8 @@ class PowerUp {
 class ZatackaGame {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
+    backgroundCanvas: HTMLCanvasElement;
+    backgroundCtx: CanvasRenderingContext2D;
     
     menuOverlay = document.getElementById('menu-overlay') as HTMLDivElement;
     roundOverOverlay = document.getElementById('round-over-overlay') as HTMLDivElement;
@@ -623,6 +664,8 @@ class ZatackaGame {
     constructor() {
         this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
         this.ctx = this.canvas.getContext('2d')!;
+        this.backgroundCanvas = document.createElement('canvas');
+        this.backgroundCtx = this.backgroundCanvas.getContext('2d')!;
         this.setupEventListeners();
         this.resizeCanvas();
         this.updatePlayerCount(this.playerCount); // Initial setup
@@ -706,6 +749,34 @@ class ZatackaGame {
         const sizeMultiplier = GAME_SIZE_MULTIPLIERS[this.gameSize];
         this.gameWidth = this.canvas.width * scale * sizeMultiplier;
         this.gameHeight = this.canvas.height * scale * sizeMultiplier;
+        
+        this.redrawBackgroundCanvas();
+    }
+    
+    redrawBackgroundCanvas() {
+        this.backgroundCanvas.width = this.gameWidth;
+        this.backgroundCanvas.height = this.gameHeight;
+        
+        this.backgroundCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-color');
+        this.backgroundCtx.fillRect(0, 0, this.gameWidth, this.gameHeight);
+        
+        const gridSize = 50;
+        this.backgroundCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-color');
+        this.backgroundCtx.lineWidth = 1;
+        this.backgroundCtx.shadowBlur = 0;
+        
+        for (let x = 0; x < this.gameWidth; x += gridSize) {
+            this.backgroundCtx.beginPath();
+            this.backgroundCtx.moveTo(x, 0);
+            this.backgroundCtx.lineTo(x, this.gameHeight);
+            this.backgroundCtx.stroke();
+        }
+        for (let y = 0; y < this.gameHeight; y += gridSize) {
+            this.backgroundCtx.beginPath();
+            this.backgroundCtx.moveTo(0, y);
+            this.backgroundCtx.lineTo(this.gameWidth, y);
+            this.backgroundCtx.stroke();
+        }
     }
 
     getWinningScore(): number {
@@ -958,9 +1029,15 @@ class ZatackaGame {
     update(deltaTime: number) {
         const now = performance.now();
         
-        // Update particles regardless of game state to let them fade out
-        this.particles.forEach(p => p.update());
-        this.particles = this.particles.filter(p => p.life > 0);
+        // OPTIMIZATION: In-place array filtering to reduce garbage collection.
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.update();
+            if (p.life <= 0) {
+                this.particles.splice(i, 1);
+            }
+        }
+        
         this.boosterPads.forEach(b => b.update(deltaTime));
 
         if (this.gameState === 'spawnSelection') {
@@ -985,7 +1062,12 @@ class ZatackaGame {
             this.powerups.forEach(p => p.update());
             this.projectiles.forEach(p => p.update(deltaTime));
 
-            this.powerups = this.powerups.filter(p => now - p.spawnTime < POWERUP_LIFESPAN);
+            // OPTIMIZATION: In-place filtering for expired power-ups.
+            for (let i = this.powerups.length - 1; i >= 0; i--) {
+                if (now - this.powerups[i].spawnTime >= POWERUP_LIFESPAN) {
+                    this.powerups.splice(i, 1);
+                }
+            }
 
             if (this.powerupsEnabled && now - this.lastPowerUpTime > POWERUP_SPAWN_INTERVAL) {
                 this.spawnPowerup();
@@ -995,8 +1077,6 @@ class ZatackaGame {
             this.checkCollisions();
             
             const alivePlayers = this.players.filter(p => p.isAlive);
-            // BUG FIX: Simplified round end condition. The second check was redundant
-            // as player count is always >= 2.
             if (this.players.length > 1 && alivePlayers.length <= 1) {
                 this.endRound();
             }
@@ -1022,6 +1102,22 @@ class ZatackaGame {
         this.particles.push(p);
     }
 
+    createBoosterImpactParticles(player: Player, pad: BoosterPad) {
+        // A more dramatic particle burst on impact
+        for (let i = 0; i < 40; i++) {
+            // Particles shoot out perpendicular to the boost direction for a "splash" effect
+            const splashAngle = pad.angle + (Math.PI / 2) * (Math.random() > 0.5 ? 1 : -1);
+            const angle = splashAngle + rand(-0.4, 0.4);
+            const speed = rand(4, 10);
+            const p = new Particle(player.x, player.y, Math.random() < 0.3 ? 'white' : '#00aaff');
+            p.vx = Math.cos(angle) * speed;
+            p.vy = Math.sin(angle) * speed;
+            p.life = rand(30, 60);
+            this.particles.push(p);
+        }
+        this.screenShake += 8; // Add a little screen shake for feedback
+    }
+
     checkBoosterPads() {
         const now = performance.now();
         for (const player of this.players) {
@@ -1029,17 +1125,17 @@ class ZatackaGame {
             if (now - player.lastBoostTime < BOOSTER_COOLDOWN) continue;
 
             for (const pad of this.boosterPads) {
-                // BUG FIX: Use circle collision for more accurate and fair pad activation.
                 const playerCircle = { x: player.x, y: player.y, radius: PLAYER_SIZE };
                 if (isCircleCollidingWithRotatedRect(playerCircle, pad)) {
-                    // Apply push based on pad's angle
+                    // Apply a single, strong impulse push, overwriting previous push velocity.
                     const pushX = Math.cos(pad.angle) * BOOSTER_PUSH_FORCE * TARGET_FPS;
                     const pushY = Math.sin(pad.angle) * BOOSTER_PUSH_FORCE * TARGET_FPS;
-                    player.pushVx += pushX;
-                    player.pushVy += pushY;
+                    player.pushVx = pushX;
+                    player.pushVy = pushY;
                     
                     player.lastBoostTime = now;
-                    this.createBoosterParticles(player);
+                    // NEW: Call the dramatic impact particle effect
+                    this.createBoosterImpactParticles(player, pad);
                     break;
                 }
             }
@@ -1094,13 +1190,11 @@ class ZatackaGame {
                 }
             }
             
-            // BUG FIX: Sort the splits by segment index in descending order for each player.
-            // This prevents array index corruption when a player's trail is split multiple times.
             trailsToSplit.sort((a, b) => {
                 if (a.player.id !== b.player.id) {
-                    return a.player.id - b.player.id; // Group by player for sanity, though not strictly necessary
+                    return a.player.id - b.player.id;
                 }
-                return b.segmentIndex - a.segmentIndex; // Process higher indices first to avoid shifting lower ones
+                return b.segmentIndex - a.segmentIndex;
             });
 
             for (const splitInfo of trailsToSplit) {
@@ -1132,18 +1226,24 @@ class ZatackaGame {
             if (!player.isAlive) continue;
             const pHead = { x: player.x, y: player.y };
 
-            if (player.isSpawnProtected()) {
-                 for (let k = this.powerups.length - 1; k >= 0; k--) {
-                    const powerup = this.powerups[k];
-                    if (distSq(pHead, powerup) < (PLAYER_SIZE + powerup.size) ** 2) {
-                        player.activatePowerUp(powerup.type, POWERUP_DURATION);
-                        for (let i = 0; i < 20; i++) this.particles.push(new Particle(player.x, player.y, 'white'));
-                        this.powerups.splice(k, 1);
-                    }
+            // BUG FIX & REFACTOR: Centralized power-up collection logic.
+            // This can happen at any time, even when spawn-protected.
+            for (let k = this.powerups.length - 1; k >= 0; k--) {
+                const powerup = this.powerups[k];
+                if (distSq(pHead, powerup) < (PLAYER_SIZE + powerup.size) ** 2) {
+                    player.activatePowerUp(powerup.type, POWERUP_DURATION);
+                    for (let i = 0; i < 20; i++) this.particles.push(new Particle(player.x, player.y, 'white'));
+                    this.powerups.splice(k, 1);
+                    break; // Player can only pick up one power-up per frame
                 }
+            }
+
+            // If player is spawn-protected, they are immune to lethal collisions.
+            if (player.isSpawnProtected()) {
                 continue;
             }
 
+            // --- Lethal Collisions ---
             // Vs Walls
             if (pHead.x < PLAYER_SIZE || pHead.x > this.gameWidth - PLAYER_SIZE ||
                 pHead.y < topBoundary + PLAYER_SIZE || pHead.y > this.gameHeight - PLAYER_SIZE) {
@@ -1155,12 +1255,12 @@ class ZatackaGame {
                 const playerCircle = { x: pHead.x, y: pHead.y, radius: PLAYER_SIZE };
                 if (isCircleCollidingWithRotatedRect(playerCircle, obs)) {
                     this.killPlayer(player);
-                    continue;
+                    break; // Player is dead, no need to check other obstacles
                 }
             }
             if (!player.isAlive) continue;
             
-            // Vs Trails
+            // Vs Trails (ghosts are immune)
             if (!player.isGhost) {
                  for (const otherPlayer of this.players) {
                     // Correctly calculate collision distance based on head radius and trail radius.
@@ -1174,17 +1274,12 @@ class ZatackaGame {
                         
                         // Prevent self-collision with the very fresh part of own trail.
                         if (player === otherPlayer && i === otherPlayer.trailSegments.length - 1 && segment.length > 0) {
-                            // This robust method defines a "danger zone" around the player's head and ignores any trail
-                            // points that fall within it. It's simpler and more reliable than predictive geometric models.
                             const selfHeadRadius = PLAYER_SIZE;
                             const selfTrailRadius = PLAYER_SIZE * player.trailWidthMultiplier;
                             const clearanceDiameter = selfHeadRadius + selfTrailRadius;
-                            // Use squared distance to avoid expensive Math.sqrt() calls.
-                            const requiredClearanceDistSq = (clearanceDiameter * 1.2) ** 2; // 20% safety margin
+                            const requiredClearanceDistSq = (clearanceDiameter * 1.2) ** 2;
 
                             let firstSafePointIndex = -1;
-
-                            // Find the first point in the trail (from newest to oldest) that is outside the danger zone.
                             for (let k = segment.length - 1; k >= 0; k--) {
                                 if (distSq(pHead, segment[k]) > requiredClearanceDistSq) {
                                     firstSafePointIndex = k;
@@ -1192,16 +1287,12 @@ class ZatackaGame {
                                 }
                             }
                             
-                            // Only check points that are "safe" (i.e., outside the immediate danger zone).
                             if (firstSafePointIndex !== -1) {
-                                // We can check all points up to and including the first safe one.
                                 pointsToCheck = segment.slice(0, firstSafePointIndex + 1);
                             } else {
-                                // The entire trail segment is within the danger zone, so check nothing.
                                 pointsToCheck = [];
                             }
                         }
-
 
                         for (const point of pointsToCheck) {
                             if (distSq(pHead, point) < collisionDistSq) {
@@ -1212,17 +1303,6 @@ class ZatackaGame {
                         if (!player.isAlive) break;
                     }
                     if (!player.isAlive) break;
-                }
-            }
-            if (!player.isAlive) continue;
-
-            // Vs Powerups
-            for (let k = this.powerups.length - 1; k >= 0; k--) {
-                const powerup = this.powerups[k];
-                if (distSq(pHead, powerup) < (PLAYER_SIZE + powerup.size) ** 2) {
-                    player.activatePowerUp(powerup.type, POWERUP_DURATION);
-                    for (let i = 0; i < 20; i++) this.particles.push(new Particle(player.x, player.y, 'white'));
-                    this.powerups.splice(k, 1);
                 }
             }
         }
@@ -1370,7 +1450,8 @@ class ZatackaGame {
         // Apply world-to-screen transform
         this.ctx.scale(this.canvas.width / this.gameWidth, this.canvas.height / this.gameHeight);
 
-        this.drawBackground();
+        // OPTIMIZATION: Draw the pre-rendered background canvas instead of redrawing the grid.
+        this.ctx.drawImage(this.backgroundCanvas, 0, 0);
 
         this.obstacles.forEach(o => o.draw(this.ctx));
         this.boosterPads.forEach(b => b.draw(this.ctx));
@@ -1423,26 +1504,6 @@ class ZatackaGame {
             if (this.gameState === 'playing') {
                 this.countdownOverlay.classList.add('hidden');
             }
-        }
-    }
-
-    drawBackground() {
-        const gridSize = 50;
-        this.ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-color');
-        this.ctx.lineWidth = 1;
-        this.ctx.shadowBlur = 0;
-        
-        for (let x = 0; x < this.gameWidth; x += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.gameHeight);
-            this.ctx.stroke();
-        }
-        for (let y = 0; y < this.gameHeight; y += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.gameWidth, y);
-            this.ctx.stroke();
         }
     }
 
