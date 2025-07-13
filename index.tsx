@@ -290,8 +290,8 @@ class Player {
     }
 
     updateSpawnSelection(keys: Set<string>, gameWidth: number, gameHeight: number, deltaTime: number) {
-        const speed = 2.5 * TARGET_FPS;
-        const turnSpeed = (TURN_SPEED * 1.5) * TARGET_FPS;
+        const speed = 5.5 * TARGET_FPS;
+        const turnSpeed = (TURN_SPEED * 2.2) * TARGET_FPS;
         
         if(keys.has(this.controls.left)) this.angle -= turnSpeed * deltaTime;
         if(keys.has(this.controls.right)) this.angle += turnSpeed * deltaTime;
