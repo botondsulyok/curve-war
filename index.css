@@ -131,6 +131,12 @@ h2 {
     font-size: 1.1rem;
 }
 
+.setting-item.hidden,
+.setting-item-full-width.hidden {
+    display: none;
+}
+
+
 .segmented-control {
     display: flex;
     width: 100%;
@@ -568,4 +574,29 @@ input:checked + .slider:before {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+#practice-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+#practice-results.hidden {
+    display: none;
+}
+
+#practice-results h3 {
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--secondary-text);
+}
+
+#survival-time-text {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--primary-text);
+    text-shadow: 0 0 10px var(--accent-color);
 }

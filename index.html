@@ -17,8 +17,15 @@
                 <h1>Curve War</h1>
                 <p class="subtitle">Last player standing wins the round.</p>
                 <div class="settings">
+                    <div class="setting-item-full-width">
+                        <label>Game Mode</label>
+                        <div class="segmented-control" id="game-mode-control">
+                            <button data-value="multiplayer" class="active">Multiplayer</button>
+                            <button data-value="practice">Practice</button>
+                        </div>
+                    </div>
                      <div class="settings-grid">
-                        <div class="setting-item">
+                        <div class="setting-item" id="player-count-setting">
                             <label for="player-count">Players</label>
                             <div class="player-count-control">
                                 <button id="player-count-minus" aria-label="Decrease player count">-</button>
@@ -56,7 +63,7 @@
                             <button data-value="large">Large</button>
                         </div>
                     </div>
-                    <div class="setting-item-full-width">
+                    <div class="setting-item-full-width" id="game-length-setting">
                         <label>Game Length</label>
                         <div class="segmented-control" id="game-length-control">
                             <button data-value="short">Short</button>
@@ -79,7 +86,8 @@
                 <h2>How to Play</h2>
                 <div class="how-to-play-content">
                     <h3>Objective</h3>
-                    <p>Be the last player standing to win the round. <span id="how-to-play-winning-score"></span> You get points based on your survival rank in each round.</p>
+                    <p><strong>Multiplayer:</strong> Be the last player standing to win the round. <span id="how-to-play-winning-score"></span> You get points based on your survival rank in each round.</p>
+                    <p><strong>Practice:</strong> Survive for as long as you can! There are no points, just the challenge of beating your own record.</p>
                     
                     <h3>Game Mechanics</h3>
                     <p><strong>Walls:</strong> Crashing into the outer walls or any player's trail will eliminate you.</p>
@@ -103,6 +111,10 @@
         <div id="round-over-overlay" class="overlay hidden">
              <div class="menu-box">
                 <h2 id="end-of-round-title"></h2>
+                <div id="practice-results" class="hidden">
+                    <h3>Time Survived</h3>
+                    <span id="survival-time-text">0.0s</span>
+                </div>
                 <div id="scoreboard-final"></div>
                 <div class="button-group">
                     <button id="play-again-btn" class="action-btn">Next Round</button>

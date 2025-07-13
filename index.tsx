@@ -52,6 +52,7 @@ const PLAYER_CONTROLS = [
 ];
 
 type GameState = 'menu' | 'spawnSelection' | 'countdown' | 'playing' | 'roundOver';
+type GameMode = 'multiplayer' | 'practice';
 type PowerUpType = 'speed' | 'shield' | 'thinLine' | 'ghost';
 type GameLength = 'short' | 'normal' | 'marathon';
 type GameSize = 'small' | 'medium' | 'large';
@@ -290,7 +291,7 @@ class Player {
     }
 
     updateSpawnSelection(keys: Set<string>, gameWidth: number, gameHeight: number, deltaTime: number) {
-        const speed = 5.5 * TARGET_FPS;
+          const speed = 5.5 * TARGET_FPS;
         const turnSpeed = (TURN_SPEED * 2.2) * TARGET_FPS;
         
         if(keys.has(this.controls.left)) this.angle -= turnSpeed * deltaTime;
@@ -630,6 +631,12 @@ class ZatackaGame {
     roundNumberTextEl = document.getElementById('round-number-text') as HTMLHeadingElement;
     countdownTextEl = document.getElementById('countdown-text') as HTMLSpanElement;
     hud = document.getElementById('hud') as HTMLDivElement;
+    playerCountSetting = document.getElementById('player-count-setting') as HTMLDivElement;
+    gameLengthSetting = document.getElementById('game-length-setting') as HTMLDivElement;
+    practiceResultsEl = document.getElementById('practice-results') as HTMLDivElement;
+    survivalTimeTextEl = document.getElementById('survival-time-text') as HTMLSpanElement;
+    finalScoreboardEl = document.getElementById('scoreboard-final') as HTMLDivElement;
+
     
     gameState: GameState = 'menu';
     isGameOver = false;
@@ -645,12 +652,14 @@ class ZatackaGame {
     lastPowerUpTime = 0;
     roundStartTime = 0;
     roundNumber = 0;
+    roundDuration = 0;
     screenShake = 0;
 
     // Game world dimensions
     gameWidth = 0;
     gameHeight = 0;
     
+    gameMode: GameMode = 'multiplayer';
     playerCount = 2;
     powerupsEnabled = true;
     obstaclesEnabled = true;
@@ -687,8 +696,6 @@ class ZatackaGame {
                         this.showHowToPlay(false);
                     }
                 } else if (this.gameState === 'roundOver' && !this.isRoundSummaryPending && !this.isGameOver) {
-                    // This robust check prevents starting a new round before the summary screen is shown.
-                    // Also prevents starting with space when the game is over.
                     this.startRound();
                 }
             }
@@ -709,6 +716,29 @@ class ZatackaGame {
         document.getElementById('powerups-toggle')!.addEventListener('change', (e) => { this.powerupsEnabled = (e.target as HTMLInputElement).checked; });
         document.getElementById('obstacles-toggle')!.addEventListener('change', (e) => { this.obstaclesEnabled = (e.target as HTMLInputElement).checked; });
         document.getElementById('shooting-toggle')!.addEventListener('change', (e) => { this.shootingEnabled = (e.target as HTMLInputElement).checked; this.updateScoreboard() });
+
+        document.getElementById('game-mode-control')!.addEventListener('click', (e) => {
+            const target = e.target as HTMLButtonElement;
+            if (target.tagName !== 'BUTTON' || !target.dataset.value) return;
+
+            this.gameMode = target.dataset.value as GameMode;
+            
+            const parent = target.parentElement!;
+            parent.querySelector('.active')?.classList.remove('active');
+            target.classList.add('active');
+            
+            if (this.gameMode === 'practice') {
+                this.playerCountSetting.classList.add('hidden');
+                this.gameLengthSetting.classList.add('hidden');
+                this.updatePlayerCount(1);
+            } else {
+                this.playerCountSetting.classList.remove('hidden');
+                this.gameLengthSetting.classList.remove('hidden');
+                 if (this.playerCount < 2) {
+                    this.updatePlayerCount(2);
+                }
+            }
+        });
 
         document.getElementById('game-length-control')!.addEventListener('click', (e) => {
             const target = e.target as HTMLButtonElement;
@@ -744,8 +774,8 @@ class ZatackaGame {
     }
 
     updateGameDimensions() {
-        // Increase game world size by 8% for each player above 2
-        const scale = 1 + (this.playerCount - 2) * 0.08;
+        const playerCountForScale = this.gameMode === 'practice' ? 2 : this.playerCount;
+        const scale = 1 + (playerCountForScale - 2) * 0.08;
         const sizeMultiplier = GAME_SIZE_MULTIPLIERS[this.gameSize];
         this.gameWidth = this.canvas.width * scale * sizeMultiplier;
         this.gameHeight = this.canvas.height * scale * sizeMultiplier;
@@ -796,7 +826,8 @@ class ZatackaGame {
     }
     
     updatePlayerCount(newCount: number) {
-        this.playerCount = Math.max(2, Math.min(8, newCount));
+        const minPlayers = this.gameMode === 'multiplayer' ? 2 : 1;
+        this.playerCount = Math.max(minPlayers, Math.min(8, newCount));
         (document.getElementById('player-count-value') as HTMLSpanElement).textContent = this.playerCount.toString();
         
         this.updateGameDimensions();
@@ -807,7 +838,8 @@ class ZatackaGame {
     updateControlsInfo() {
         const infoBox = document.getElementById('controls-info')!;
         infoBox.innerHTML = '';
-        for (let i = 0; i < this.playerCount; i++) {
+        const count = this.gameMode === 'practice' ? 1 : this.playerCount;
+        for (let i = 0; i < count; i++) {
             const p = PLAYER_CONTROLS[i];
             const color = PLAYER_COLORS[i];
             const div = document.createElement('div');
@@ -846,9 +878,22 @@ class ZatackaGame {
         this.isGameOver = false;
         this.isRoundSummaryPending = false;
         this.draw();
+
+        // Reset UI to default multiplayer view
+        this.gameMode = 'multiplayer';
+        this.playerCountSetting.classList.remove('hidden');
+        this.gameLengthSetting.classList.remove('hidden');
+        const gameModeControl = document.getElementById('game-mode-control')!;
+        gameModeControl.querySelector('[data-value="practice"]')?.classList.remove('active');
+        gameModeControl.querySelector('[data-value="multiplayer"]')?.classList.add('active');
+        this.updatePlayerCount(2);
     }
     
     startGame() {
+        if (this.gameMode === 'practice') {
+            this.playerCount = 1;
+        }
+
         this.players = [];
         for (let i = 0; i < this.playerCount; i++) {
             const p = new Player(i);
@@ -867,6 +912,7 @@ class ZatackaGame {
         }
         
         this.roundStartTime = performance.now();
+        this.roundDuration = 0;
         this.roundNumber++;
         this.gameState = 'spawnSelection';
         
@@ -885,22 +931,19 @@ class ZatackaGame {
         this.keys.clear();
         this.generateLevelElements();
 
-        // BUG FIX: Ensure players get a valid, non-colliding initial spawn position.
         const spawnPoints: Point[] = [];
         this.players.forEach(p => {
             let validSpawn = false;
-            let retries = 50; // Prevent infinite loops on crowded maps
+            let retries = 50; 
             while (!validSpawn && retries > 0) {
                 retries--;
                 p.prepareForSpawnSelection(this.gameWidth, this.gameHeight);
 
                 const ghostPosition = { x: p.ghostX, y: p.ghostY };
-                // Use a large radius for spawn clearance, matching the ghost selection visual
                 const spawnRadius = PLAYER_SIZE * 4;
                 const playerCircle = { ...ghostPosition, radius: spawnRadius };
 
                 let collision = false;
-                // Check against obstacles
                 for (const obs of this.obstacles) {
                     if (isCircleCollidingWithRotatedRect(playerCircle, obs)) {
                         collision = true;
@@ -909,9 +952,7 @@ class ZatackaGame {
                 }
                 if (collision) continue;
 
-                // Check against other player spawn points
                 for (const sp of spawnPoints) {
-                    // Check if spawn areas overlap
                     if (distSq(ghostPosition, sp) < (spawnRadius * 2) ** 2) {
                         collision = true;
                         break;
@@ -919,7 +960,6 @@ class ZatackaGame {
                 }
                 if (collision) continue;
 
-                // If we are here, the spawn is valid
                 validSpawn = true;
                 spawnPoints.push(ghostPosition);
             }
@@ -945,7 +985,12 @@ class ZatackaGame {
         const allElements: Rect[] = [];
         let retries = 100;
 
-        const areaScale = (this.gameWidth * this.gameHeight) / (this.canvas.width * this.canvas.height);
+        const playerCountForScale = this.gameMode === 'practice' ? 2 : this.playerCount;
+        const baseArea = this.canvas.width * this.canvas.height;
+        const gameArea = this.gameWidth * this.gameHeight;
+        const effectivePlayerCount = (1 + (playerCountForScale - 2) * 0.08);
+        const areaScale = (gameArea / baseArea) / effectivePlayerCount;
+
         const scaledObstacleCount = Math.round(OBSTACLE_COUNT * areaScale);
         const scaledBoosterCount = Math.round(BOOSTER_COUNT * areaScale);
         const topBoundary = TOP_MARGIN * (this.gameHeight / this.canvas.height);
@@ -1029,7 +1074,6 @@ class ZatackaGame {
     update(deltaTime: number) {
         const now = performance.now();
         
-        // OPTIMIZATION: In-place array filtering to reduce garbage collection.
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
             p.update();
@@ -1055,6 +1099,7 @@ class ZatackaGame {
                 this.gameState = 'playing';
             }
         } else if (this.gameState === 'playing') {
+            this.roundDuration += deltaTime;
             this.handlePlayerInput();
             this.checkBoosterPads();
             this.players.forEach(p => p.move(this.keys, () => this.createBoosterParticles(p), deltaTime));
@@ -1062,7 +1107,6 @@ class ZatackaGame {
             this.powerups.forEach(p => p.update());
             this.projectiles.forEach(p => p.update(deltaTime));
 
-            // OPTIMIZATION: In-place filtering for expired power-ups.
             for (let i = this.powerups.length - 1; i >= 0; i--) {
                 if (now - this.powerups[i].spawnTime >= POWERUP_LIFESPAN) {
                     this.powerups.splice(i, 1);
@@ -1077,7 +1121,18 @@ class ZatackaGame {
             this.checkCollisions();
             
             const alivePlayers = this.players.filter(p => p.isAlive);
-            if (this.players.length > 1 && alivePlayers.length <= 1) {
+            let roundShouldEnd = false;
+            if (this.gameMode === 'multiplayer') {
+                if (this.players.length > 1 && alivePlayers.length <= 1) {
+                    roundShouldEnd = true;
+                }
+            } else { // practice mode
+                if (this.players.length > 0 && alivePlayers.length === 0) {
+                    roundShouldEnd = true;
+                }
+            }
+
+            if (roundShouldEnd) {
                 this.endRound();
             }
         }
@@ -1103,9 +1158,7 @@ class ZatackaGame {
     }
 
     createBoosterImpactParticles(player: Player, pad: BoosterPad) {
-        // A more dramatic particle burst on impact
         for (let i = 0; i < 40; i++) {
-            // Particles shoot out perpendicular to the boost direction for a "splash" effect
             const splashAngle = pad.angle + (Math.PI / 2) * (Math.random() > 0.5 ? 1 : -1);
             const angle = splashAngle + rand(-0.4, 0.4);
             const speed = rand(4, 10);
@@ -1115,7 +1168,7 @@ class ZatackaGame {
             p.life = rand(30, 60);
             this.particles.push(p);
         }
-        this.screenShake += 8; // Add a little screen shake for feedback
+        this.screenShake += 8;
     }
 
     checkBoosterPads() {
@@ -1127,14 +1180,12 @@ class ZatackaGame {
             for (const pad of this.boosterPads) {
                 const playerCircle = { x: player.x, y: player.y, radius: PLAYER_SIZE };
                 if (isCircleCollidingWithRotatedRect(playerCircle, pad)) {
-                    // Apply a single, strong impulse push, overwriting previous push velocity.
                     const pushX = Math.cos(pad.angle) * BOOSTER_PUSH_FORCE * TARGET_FPS;
                     const pushY = Math.sin(pad.angle) * BOOSTER_PUSH_FORCE * TARGET_FPS;
                     player.pushVx = pushX;
                     player.pushVy = pushY;
                     
                     player.lastBoostTime = now;
-                    // NEW: Call the dramatic impact particle effect
                     this.createBoosterImpactParticles(player, pad);
                     break;
                 }
@@ -1143,29 +1194,24 @@ class ZatackaGame {
     }
 
     checkCollisions() {
-        // --- Projectile Collisions ---
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const proj = this.projectiles[i];
 
-            // Vs players
             for (const player of this.players) {
                 if (player.isAlive && player !== proj.owner && !proj.playersHit.has(player.id)) {
                     if (distSq(proj, player) < (PROJECTILE_SIZE + PLAYER_SIZE) ** 2) {
                         this.killPlayer(player, 'projectile');
                         proj.playersHit.add(player.id);
-                        // Projectile continues, does not get destroyed on player hit
                     }
                 }
             }
 
-            // Vs walls
             if (proj.x < 0 || proj.x > this.gameWidth || proj.y < 0 || proj.y > this.gameHeight) {
                 this.projectiles.splice(i, 1);
                 continue;
             }
         }
         
-        // --- Projectile Vs Trails (Eraser effect) ---
         if (this.projectiles.length > 0) {
             const trailsToSplit: { player: Player; segmentIndex: number; splitIndices: Set<number> }[] = [];
 
@@ -1175,7 +1221,7 @@ class ZatackaGame {
                         const segment = player.trailSegments[i];
                         for (let j = 0; j < segment.length; j++) {
                              if (player === proj.owner && i === player.trailSegments.length - 1 && j > segment.length - 15) {
-                                continue; // Skip the last 15 points of the owner's newest trail segment
+                                continue;
                             }
                             if (distSq(proj, segment[j]) < PROJECTILE_TRAIL_CLEAR_RADIUS ** 2) {
                                 let splitInfo = trailsToSplit.find(t => t.player === player && t.segmentIndex === i);
@@ -1219,51 +1265,41 @@ class ZatackaGame {
             }
         }
 
-
-        // --- Player Collisions ---
         const topBoundary = TOP_MARGIN * (this.gameHeight / this.canvas.height);
         for (const player of this.players) {
             if (!player.isAlive) continue;
             const pHead = { x: player.x, y: player.y };
 
-            // BUG FIX & REFACTOR: Centralized power-up collection logic.
-            // This can happen at any time, even when spawn-protected.
             for (let k = this.powerups.length - 1; k >= 0; k--) {
                 const powerup = this.powerups[k];
                 if (distSq(pHead, powerup) < (PLAYER_SIZE + powerup.size) ** 2) {
                     player.activatePowerUp(powerup.type, POWERUP_DURATION);
                     for (let i = 0; i < 20; i++) this.particles.push(new Particle(player.x, player.y, 'white'));
                     this.powerups.splice(k, 1);
-                    break; // Player can only pick up one power-up per frame
+                    break; 
                 }
             }
 
-            // If player is spawn-protected, they are immune to lethal collisions.
             if (player.isSpawnProtected()) {
                 continue;
             }
 
-            // --- Lethal Collisions ---
-            // Vs Walls
             if (pHead.x < PLAYER_SIZE || pHead.x > this.gameWidth - PLAYER_SIZE ||
                 pHead.y < topBoundary + PLAYER_SIZE || pHead.y > this.gameHeight - PLAYER_SIZE) {
                 this.killPlayer(player); continue;
             }
 
-            // Vs Obstacles
             for (const obs of this.obstacles) {
                 const playerCircle = { x: pHead.x, y: pHead.y, radius: PLAYER_SIZE };
                 if (isCircleCollidingWithRotatedRect(playerCircle, obs)) {
                     this.killPlayer(player);
-                    break; // Player is dead, no need to check other obstacles
+                    break;
                 }
             }
             if (!player.isAlive) continue;
             
-            // Vs Trails (ghosts are immune)
             if (!player.isGhost) {
                  for (const otherPlayer of this.players) {
-                    // Correctly calculate collision distance based on head radius and trail radius.
                     const headRadius = PLAYER_SIZE;
                     const trailRadius = PLAYER_SIZE * otherPlayer.trailWidthMultiplier;
                     const collisionDistSq = (headRadius + trailRadius) ** 2;
@@ -1272,7 +1308,6 @@ class ZatackaGame {
                         const segment = otherPlayer.trailSegments[i];
                         let pointsToCheck = segment;
                         
-                        // Prevent self-collision with the very fresh part of own trail.
                         if (player === otherPlayer && i === otherPlayer.trailSegments.length - 1 && segment.length > 0) {
                             const selfHeadRadius = PLAYER_SIZE;
                             const selfTrailRadius = PLAYER_SIZE * player.trailWidthMultiplier;
@@ -1318,17 +1353,17 @@ class ZatackaGame {
 
             for(let i = 0; i < 30; i++) this.particles.push(new Particle(player.x, player.y, 'white'));
             this.screenShake = 10;
-            return; // Player is saved from the projectile
+            return;
         }
 
         player.isAlive = false;
         this.eliminationOrder.push(player);
 
         const remainingAlive = this.players.filter(p => p.isAlive).length;
-        const isRoundEndingKill = this.players.length > 1 && remainingAlive <= 1;
+        const isRoundEndingKill = (this.gameMode === 'multiplayer' && this.players.length > 1 && remainingAlive <= 1) ||
+                                  (this.gameMode === 'practice' && remainingAlive === 0);
 
         if (cause === 'projectile' || isRoundEndingKill) {
-            // Spectacular headshot effect
             this.screenShake = 35;
             for(let i = 0; i < 150; i++) {
                 const p = new Particle(player.x, player.y, Math.random() < 0.3 ? 'white' : player.color);
@@ -1340,7 +1375,6 @@ class ZatackaGame {
                 this.particles.push(p);
             }
         } else {
-            // Normal crash effect
             this.screenShake = 15;
             for(let i = 0; i < 60; i++) this.particles.push(new Particle(player.x, player.y, player.color));
         }
@@ -1363,81 +1397,92 @@ class ZatackaGame {
         this.gameState = 'roundOver';
         this.isRoundSummaryPending = true;
 
-        const alivePlayers = this.players.filter(p => p.isAlive);
-        const winner = alivePlayers.length === 1 ? alivePlayers[0] : undefined;
-        
-        // Announce winner immediately
-        this.countdownTitleEl.textContent = winner ? `${winner.name} wins the round!` : "It's a Draw!";
-        this.countdownTitleEl.style.color = winner ? winner.color : 'white';
-        this.countdownTitleEl.classList.add('winner-announcement');
-        this.roundNumberTextEl.style.display = 'none';
-        this.countdownTextEl.style.display = 'none';
-        this.countdownOverlay.classList.remove('hidden');
+        if (this.gameMode === 'multiplayer') {
+            const alivePlayers = this.players.filter(p => p.isAlive);
+            const winner = alivePlayers.length === 1 ? alivePlayers[0] : undefined;
+            
+            this.countdownTitleEl.textContent = winner ? `${winner.name} wins the round!` : "It's a Draw!";
+            this.countdownTitleEl.style.color = winner ? winner.color : 'white';
+            this.countdownTitleEl.classList.add('winner-announcement');
+            this.roundNumberTextEl.style.display = 'none';
+            this.countdownTextEl.style.display = 'none';
+            this.countdownOverlay.classList.remove('hidden');
+        }
 
-        // Show the summary screen after a delay
         setTimeout(() => {
             this.showRoundSummary();
-        }, 2500);
+        }, this.gameMode === 'multiplayer' ? 2500 : 1000);
     }
 
     showRoundSummary() {
         this.isRoundSummaryPending = false;
-        if (this.gameState !== 'roundOver') return; // Prevent multiple executions
+        if (this.gameState !== 'roundOver') return; 
         
-        const alivePlayers = this.players.filter(p => p.isAlive);
-        const finalRanking = [...this.eliminationOrder, ...alivePlayers].reverse();
-        const pointsToAward = new Map<Player, number>();
-        
-        // Revised scoring: Last place gets 1 point, 2nd to last gets 2, etc.
-        finalRanking.forEach((player, index) => {
-            const pointsAwarded = this.players.length - index;
-            if (pointsAwarded > 0) {
-                 player.score += pointsAwarded;
-                 pointsToAward.set(player, pointsAwarded);
-            }
-        });
-        
-        const winningScore = this.getWinningScore();
-        const winner = alivePlayers.length === 1 ? alivePlayers[0] : undefined;
-        
-        const gameWinner = this.players.find(p => p.score >= winningScore);
         const endTitle = document.getElementById('end-of-round-title') as HTMLHeadingElement;
-        if (gameWinner) {
-            this.isGameOver = true;
-            endTitle.textContent = `The ${gameWinner.name} player wins the game!`;
-            (document.getElementById('play-again-btn') as HTMLButtonElement).textContent = 'New Game';
-        } else {
-            endTitle.textContent = winner ? `The ${winner.name} player wins the round!` : "It's a draw!";
-            (document.getElementById('play-again-btn') as HTMLButtonElement).textContent = 'Next Round';
+        const playAgainBtn = document.getElementById('play-again-btn') as HTMLButtonElement;
+
+        if (this.gameMode === 'practice') {
+            this.finalScoreboardEl.classList.add('hidden');
+            this.practiceResultsEl.classList.remove('hidden');
+            this.survivalTimeTextEl.textContent = `${this.roundDuration.toFixed(1)}s`;
+            
+            endTitle.textContent = 'Practice Over!';
+            playAgainBtn.textContent = 'Try Again';
+
+        } else { // Multiplayer mode
+            this.finalScoreboardEl.classList.remove('hidden');
+            this.practiceResultsEl.classList.add('hidden');
+            
+            const alivePlayers = this.players.filter(p => p.isAlive);
+            const finalRanking = [...this.eliminationOrder, ...alivePlayers].reverse();
+            const pointsToAward = new Map<Player, number>();
+            
+            finalRanking.forEach((player, index) => {
+                const pointsAwarded = this.players.length - index;
+                if (pointsAwarded > 0) {
+                     player.score += pointsAwarded;
+                     pointsToAward.set(player, pointsAwarded);
+                }
+            });
+            
+            const winningScore = this.getWinningScore();
+            const winner = alivePlayers.length === 1 ? alivePlayers[0] : undefined;
+            
+            const gameWinner = this.players.find(p => p.score >= winningScore);
+            if (gameWinner) {
+                this.isGameOver = true;
+                endTitle.textContent = `The ${gameWinner.name} player wins the game!`;
+                playAgainBtn.textContent = 'New Game';
+            } else {
+                endTitle.textContent = winner ? `The ${winner.name} player wins the round!` : "It's a draw!";
+                playAgainBtn.textContent = 'Next Round';
+            }
+            
+            this.updateFinalScoreboard(pointsToAward);
+
+            // Trigger score animations
+            setTimeout(() => {
+                const awardedSpans = document.querySelectorAll('#scoreboard-final .points-awarded');
+                awardedSpans.forEach((span, index) => {
+                    setTimeout(() => {
+                        (span as HTMLElement).classList.add('visible');
+                    }, index * 150);
+                });
+            }, 200);
         }
         
-        // Hide winner announcement and show final scoreboard
         this.countdownOverlay.classList.add('hidden');
-        // Reset countdown styles for the next round
         this.roundNumberTextEl.style.display = 'block';
         this.countdownTextEl.style.display = 'block';
         this.countdownTitleEl.style.color = '';
         this.countdownTitleEl.classList.remove('winner-announcement');
-
-        this.updateFinalScoreboard(pointsToAward);
         this.roundOverOverlay.classList.remove('hidden');
-
-        // Trigger score animations after a short delay
-        setTimeout(() => {
-            const awardedSpans = document.querySelectorAll('#scoreboard-final .points-awarded');
-            awardedSpans.forEach((span, index) => {
-                setTimeout(() => {
-                    (span as HTMLElement).classList.add('visible');
-                }, index * 150); // Staggered animation
-            });
-        }, 200);
     }
 
     draw() {
         this.ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-color');
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // --- Start of world-space drawing context ---
         this.ctx.save();
         if (this.screenShake > 0) {
             const dx = (Math.random() - 0.5) * this.screenShake;
@@ -1447,10 +1492,7 @@ class ZatackaGame {
             if (this.screenShake < 0.5) this.screenShake = 0;
         }
 
-        // Apply world-to-screen transform
         this.ctx.scale(this.canvas.width / this.gameWidth, this.canvas.height / this.gameHeight);
-
-        // OPTIMIZATION: Draw the pre-rendered background canvas instead of redrawing the grid.
         this.ctx.drawImage(this.backgroundCanvas, 0, 0);
 
         this.obstacles.forEach(o => o.draw(this.ctx));
@@ -1466,10 +1508,8 @@ class ZatackaGame {
         this.projectiles.forEach(p => p.draw(this.ctx));
         this.particles.forEach(p => p.draw(this.ctx));
         
-        // --- End of world-space drawing context ---
         this.ctx.restore();
 
-        // Draw HUD safety line in SCREEN SPACE (after restore)
         this.ctx.save();
         this.ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
         this.ctx.shadowColor = 'rgba(255, 100, 100, 0.8)';
@@ -1490,14 +1530,14 @@ class ZatackaGame {
             const remaining = Math.max(0, SPAWN_SELECTION_DURATION - elapsed);
             this.roundNumberTextEl.style.display = 'block';
             this.countdownTextEl.style.display = 'block';
-            this.roundNumberTextEl.textContent = `Round ${this.roundNumber}`;
+            this.roundNumberTextEl.textContent = this.gameMode === 'practice' ? 'Practice' : `Round ${this.roundNumber}`;
             this.countdownTitleEl.textContent = 'CHOOSE YOUR START';
             this.countdownTextEl.textContent = Math.ceil(remaining / 1000).toString();
             this.countdownOverlay.classList.remove('hidden');
         } else if (this.gameState === 'countdown') {
             this.roundNumberTextEl.style.display = 'block';
             this.countdownTextEl.style.display = 'none'; // Hide the "GO!" text
-            this.roundNumberTextEl.textContent = `Round ${this.roundNumber}`;
+            this.roundNumberTextEl.textContent = this.gameMode === 'practice' ? 'Practice' : `Round ${this.roundNumber}`;
             this.countdownTitleEl.textContent = 'GET READY!';
             this.countdownOverlay.classList.remove('hidden');
         } else if (this.gameState === 'playing' || this.gameState === 'roundOver') {
@@ -1510,8 +1550,10 @@ class ZatackaGame {
     updateScoreboard = () => {
         const scoreboard = document.getElementById('scoreboard')!;
         scoreboard.innerHTML = '';
-        const sortedPlayers = [...this.players].sort((a, b) => b.score - a.score)
-        sortedPlayers.forEach(p => {
+        
+        const playersToShow = this.gameMode === 'practice' ? this.players : [...this.players].sort((a, b) => b.score - a.score);
+        
+        playersToShow.forEach(p => {
             const el = document.createElement('div');
             el.className = 'player-score';
             if (!p.isAlive) el.classList.add('dead');
@@ -1525,9 +1567,13 @@ class ZatackaGame {
                 ammoDisplay = `<div class="player-ammo">${dots}</div>`;
             }
 
+            const scoreText = this.gameMode === 'practice' 
+                ? `${(this.roundDuration).toFixed(1)}s` 
+                : `${p.name}: ${p.score}`;
+
             el.innerHTML = `
                 <div class="player-color-dot" style="background-color: ${p.color};"></div>
-                <span class="player-name-score">${p.name}: ${p.score}</span>
+                <span class="player-name-score">${scoreText}</span>
                 ${ammoDisplay}
             `;
             scoreboard.appendChild(el);
