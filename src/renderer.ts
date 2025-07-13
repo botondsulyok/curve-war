@@ -101,6 +101,9 @@ export class Renderer {
         this.ctx.beginPath();
         this.ctx.moveTo(0, activeConfig.TOP_MARGIN);
         this.ctx.lineTo(this.canvas.width, activeConfig.TOP_MARGIN);
+        this.ctx.lineTo(this.canvas.width, this.canvas.height);
+        this.ctx.lineTo(0, this.canvas.height);
+        this.ctx.closePath();
         this.ctx.stroke();
         this.ctx.restore();
     }
