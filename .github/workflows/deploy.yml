@@ -4,7 +4,7 @@ on:
   # Run this workflow every time you push to the main branch
   push:
     branches:
-      - main # Or 'master', depending on your default branch name
+      - main
 
 # Set permissions for the workflow to read contents and write to pages
 permissions:
@@ -31,14 +31,17 @@ jobs:
       - name: Build the project
         run: |
           # Create a 'build' directory for the output
-          mkdir build
-          # Compile the TSX file into a single JS file in the build directory
-      npx esbuild index.tsx --bundle --platform=browser --outfile=build/index.js --minify
-          # Copy the HTML and CSS files to the build directory
+          mkdir -p build
+
+          # Compile the TSX file into a single JS bundle for the browser
+          npx esbuild index.tsx --bundle --platform=browser --outfile=build/index.js --minify
+
+          # Copy HTML and CSS to the build directory
           cp index.html build/index.html
           cp index.css build/index.css
-          # Update the script tag in the HTML to point to the compiled JS file
-          sed -i 's/src="index.tsx"/src="index.js"/' build/index.html
+
+          # Replace script src and add type="module"
+          sed -i 's|src="index.tsx"|type="module" src="index.js"|' build/index.html
 
       - name: Upload production-ready build files
         uses: actions/upload-pages-artifact@v3
@@ -46,7 +49,6 @@ jobs:
           path: './build'
 
   deploy:
-    # This job depends on the 'build' job completing successfully
     needs: build
     runs-on: ubuntu-latest
     environment:
