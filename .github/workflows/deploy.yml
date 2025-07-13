@@ -33,7 +33,7 @@ jobs:
           # Create a 'build' directory for the output
           mkdir build
           # Compile the TSX file into a single JS file in the build directory
-          npx esbuild index.tsx --bundle --outfile=build/index.js --minify
+      npx esbuild index.tsx --bundle --platform=browser --outfile=build/index.js --minify
           # Copy the HTML and CSS files to the build directory
           cp index.html build/index.html
           cp index.css build/index.css
