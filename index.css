@@ -5,9 +5,10 @@
     --secondary-text: #b0b0b0;
     --panel-bg: rgba(20, 20, 25, 0.85);
     --panel-border: rgba(255, 255, 255, 0.1);
-    --accent-color: #007aff;
-    --accent-hover: #0056b3;
+    --accent-color: #007BFF;
+    --accent-hover: #0069D9;
     --danger-color: #ff3b30;
+    --danger-hover: #c7001e;
     --success-color: #34c759;
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
@@ -66,7 +67,7 @@ html, body {
 .menu-box {
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
-    padding: 2rem 3rem;
+    padding: 1.5rem 2.5rem;
     border-radius: 16px;
     text-align: center;
     max-width: 90%;
@@ -74,7 +75,36 @@ html, body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
+    max-height: 90vh; /* Prevent popups from being taller than screen */
+    gap: 1.5rem; /* Add spacing for simple popups like confirmation dialogs */
+    overflow-y: auto; /* Allow scrolling on smaller popups if needed */
+}
+
+/* Specific styles for the main menu to make it tall and handle scrolling internally */
+#menu-overlay .menu-box {
+    min-height: 90%;
+    overflow: hidden;
+    padding: 0;
+    gap: 0;
+}
+
+.menu-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
     gap: 1.5rem;
+    padding: 1.5rem 2.5rem;
+}
+
+.menu-footer {
+    flex-shrink: 0;
+    padding: 1rem 2.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    border-top: 1px solid var(--panel-border);
 }
 
 h1 {
@@ -103,11 +133,26 @@ h2 {
     text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
 }
 
+/* Helper class to disable transitions during initialization */
+.settings.no-transitions,
+.settings.no-transitions *,
+.settings.no-transitions *::before,
+.settings.no-transitions *::after {
+    transition: none !important;
+}
+
 .settings {
     display: flex;
     flex-direction: column;
     gap: 1.2rem;
     text-align: left;
+    visibility: hidden; /* Hide until initialized to prevent FOUC */
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+.settings.initialized {
+    visibility: visible;
+    opacity: 1;
 }
 
 .settings-grid {
@@ -132,7 +177,8 @@ h2 {
 }
 
 .setting-item.hidden,
-.setting-item-full-width.hidden {
+.setting-item-full-width.hidden,
+.adv-setting-row.hidden {
     display: none;
 }
 
@@ -202,10 +248,8 @@ h2 {
     background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
     padding: 1rem;
-    max-height: 180px;
-    overflow-y: auto;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 0.75rem;
     text-align: left;
     font-size: 0.9rem;
@@ -215,6 +259,14 @@ h2 {
     display: flex;
     align-items: center;
     gap: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.control-player-info:hover {
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .player-color-dot {
@@ -256,6 +308,30 @@ h2 {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
+#reset-defaults-btn {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    color: var(--secondary-text);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color 0.2s ease;
+}
+#reset-defaults-btn:hover {
+    color: var(--danger-color);
+}
+
+#confirm-reset-btn {
+    background-color: var(--danger-color);
+}
+#confirm-reset-btn:hover {
+    background-color: var(--danger-hover);
+    box-shadow: 0 4px 12px rgba(255, 59, 48, 0.3);
+}
+
 .button-group {
     display: flex;
     gap: 1rem;
@@ -274,6 +350,8 @@ h2 {
     z-index: 5;
     backdrop-filter: blur(5px);
     transition: opacity 0.3s ease;
+    max-width: 95vw;
+    overflow-x: auto;
 }
 
 #hud.hidden {
@@ -294,6 +372,7 @@ h2 {
     gap: 0.5rem;
     font-weight: 600;
     transition: opacity 0.3s;
+    white-space: nowrap; /* Prevent ugly wrapping in scoreboard */
 }
 
 .player-score.dead {
@@ -334,6 +413,10 @@ h2 {
     flex-direction: column;
     gap: 0.75rem;
     align-items: center;
+}
+
+#scoreboard-final.hidden {
+    display: none;
 }
 
 .player-score-final {
@@ -599,4 +682,138 @@ input:checked + .slider:before {
     font-weight: 700;
     color: var(--primary-text);
     text-shadow: 0 0 10px var(--accent-color);
+}
+
+/* Settings & Player Settings */
+.settings-content {
+    text-align: left;
+    max-height: 60vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 0.5rem 1rem 0.5rem 0.5rem;
+    margin-right: -1rem; /* Counteract padding for scrollbar */
+}
+
+.setting-group {
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 1rem 1.5rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.setting-group legend {
+    padding: 0 0.5rem;
+    margin-left: -0.5rem;
+    font-weight: 600;
+    color: var(--secondary-text);
+}
+
+.adv-setting-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    align-items: center;
+}
+
+.adv-setting-row label {
+    font-size: 1rem;
+    color: var(--primary-text);
+}
+
+.adv-setting-row .input-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.text-input, .adv-setting-row input[type="number"] {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--panel-border);
+    color: var(--primary-text);
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    width: 80px;
+}
+
+.text-input {
+    width: 150px;
+}
+
+.text-input:focus, .adv-setting-row input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 5px var(--accent-color);
+}
+
+/* Player Customization UI */
+.color-selector {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0.75rem;
+}
+
+.color-swatch {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: all 0.2s;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+}
+
+.color-swatch.selected {
+    border-color: white;
+    box-shadow: 0 0 10px white;
+}
+
+.color-swatch.disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
+}
+
+.controls-header {
+    text-align: left;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--primary-text);
+    margin-top: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.key-input-btn {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--panel-border);
+    color: var(--primary-text);
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    min-width: 150px;
+    text-align: center;
+    cursor: pointer;
+    font-family: var(--font-family);
+    transition: all 0.2s;
+}
+
+.key-input-btn:hover {
+    border-color: var(--secondary-text);
+}
+
+.key-input-btn.listening {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 5px var(--accent-color);
+    color: var(--accent-color);
+    font-weight: 700;
 }

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,68 +15,113 @@
         <!-- Main Menu -->
         <div id="menu-overlay" class="overlay">
             <div class="menu-box">
-                <h1>Curve War</h1>
-                <p class="subtitle">Last player standing wins the round.</p>
-                <div class="settings">
-                    <div class="setting-item-full-width">
-                        <label>Game Mode</label>
-                        <div class="segmented-control" id="game-mode-control">
-                            <button data-value="multiplayer" class="active">Multiplayer</button>
-                            <button data-value="practice">Practice</button>
-                        </div>
-                    </div>
-                     <div class="settings-grid">
-                        <div class="setting-item" id="player-count-setting">
-                            <label for="player-count">Players</label>
-                            <div class="player-count-control">
-                                <button id="player-count-minus" aria-label="Decrease player count">-</button>
-                                <span id="player-count-value">2</span>
-                                <button id="player-count-plus" aria-label="Increase player count">+</button>
+                <div class="menu-content">
+                    <h1>Curve War</h1>
+                    <p class="subtitle">Last player standing wins the round.</p>
+                    <div class="settings">
+                        <div class="setting-item-full-width">
+                            <label>Game Mode</label>
+                            <div class="segmented-control" id="game-mode-control">
+                                <button data-value="multiplayer" class="active">Multiplayer</button>
+                                <button data-value="practice">Practice</button>
                             </div>
                         </div>
-                        <div class="setting-item">
-                            <label for="powerups-toggle">Power-ups</label>
-                             <label class="switch">
-                                <input type="checkbox" id="powerups-toggle" checked>
-                                <span class="slider"></span>
-                            </label>
+                         <div class="settings-grid">
+                            <div class="setting-item" id="player-count-setting">
+                                <label for="player-count">Players</label>
+                                <div class="player-count-control">
+                                    <button id="player-count-minus" aria-label="Decrease player count">-</button>
+                                    <span id="player-count-value">2</span>
+                                    <button id="player-count-plus" aria-label="Increase player count">+</button>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label for="powerups-toggle">Power-ups</label>
+                                 <label class="switch">
+                                    <input type="checkbox" id="powerups-toggle">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <label for="obstacles-toggle">Obstacles & Boosters</label>
+                                 <label class="switch">
+                                    <input type="checkbox" id="obstacles-toggle">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                             <div class="setting-item">
+                                <label for="shooting-toggle">Shooting</label>
+                                 <label class="switch">
+                                    <input type="checkbox" id="shooting-toggle">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
                         </div>
-                        <div class="setting-item">
-                            <label for="obstacles-toggle">Obstacles & Boosters</label>
-                             <label class="switch">
-                                <input type="checkbox" id="obstacles-toggle" checked>
-                                <span class="slider"></span>
-                            </label>
+                        <div class="setting-item-full-width">
+                            <label>Game Area Size</label>
+                            <div class="segmented-control" id="game-size-control">
+                                <button data-value="small">Small</button>
+                                <button data-value="medium" class="active">Medium</button>
+                                <button data-value="large">Large</button>
+                            </div>
                         </div>
-                         <div class="setting-item">
-                            <label for="shooting-toggle">Shooting</label>
-                             <label class="switch">
-                                <input type="checkbox" id="shooting-toggle" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
+                        <div class="setting-item-full-width" id="game-length-setting">
+                            <label>Game Length</label>
+                            <div class="segmented-control" id="game-length-control">
+                                <button data-value="short">Short</button>
+                                <button data-value="normal" class="active">Normal</button>
+                                <button data-value="marathon">Marathon</button>
+                            </div>
+                       </div>
+                       <div id="advanced-settings-container" class="setting-group">
+                            <legend>Advanced Settings</legend>
+                            <!-- Advanced settings will be generated by UIManager -->
+                       </div>
+                    </div>
+                     <div id="controls-info"></div>
+                </div>
+                <div class="menu-footer">
+                     <div class="button-group">
+                        <button id="start-game-btn" class="action-btn">Start Game</button>
+                        <button id="how-to-play-btn" class="secondary-btn">How to Play</button>
+                    </div>
+                    <button id="reset-defaults-btn">Reset to Defaults</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Settings Screen -->
+        <div id="player-settings-overlay" class="overlay hidden">
+            <div class="menu-box">
+                <h2 id="player-settings-title">Player Settings</h2>
+                <div id="player-settings-form" class="settings-content">
+                    <div class="adv-setting-row">
+                        <label for="player-name-input">Name</label>
+                        <input type="text" id="player-name-input" class="text-input" maxlength="12">
                     </div>
                     <div class="setting-item-full-width">
-                        <label>Game Area Size</label>
-                        <div class="segmented-control" id="game-size-control">
-                            <button data-value="small">Small</button>
-                            <button data-value="medium" class="active">Medium</button>
-                            <button data-value="large">Large</button>
+                        <label>Color</label>
+                        <div id="player-color-selector" class="color-selector">
+                            <!-- color swatches go here -->
                         </div>
                     </div>
-                    <div class="setting-item-full-width" id="game-length-setting">
-                        <label>Game Length</label>
-                        <div class="segmented-control" id="game-length-control">
-                            <button data-value="short">Short</button>
-                            <button data-value="normal" class="active">Normal</button>
-                            <button data-value="marathon">Marathon</button>
-                        </div>
-                   </div>
+                    <h3 class="controls-header">Controls</h3>
+                    <div class="adv-setting-row">
+                        <label for="control-left-input">Left</label>
+                        <button id="control-left-input" class="key-input-btn"></button>
+                    </div>
+                    <div class="adv-setting-row">
+                        <label for="control-right-input">Right</label>
+                        <button id="control-right-input" class="key-input-btn"></button>
+                    </div>
+                    <div class="adv-setting-row">
+                        <label for="control-fire-input">Fire</label>
+                        <button id="control-fire-input" class="key-input-btn"></button>
+                    </div>
                 </div>
-                 <div id="controls-info"></div>
-                 <div class="button-group">
-                    <button id="start-game-btn" class="action-btn">Start Game</button>
-                    <button id="how-to-play-btn" class="secondary-btn">How to Play</button>
+                <div class="button-group">
+                    <button id="save-player-settings-btn" class="action-btn">Save</button>
+                    <button id="cancel-player-settings-btn" class="secondary-btn">Cancel</button>
                 </div>
             </div>
         </div>
@@ -91,7 +137,7 @@
                     
                     <h3>Game Mechanics</h3>
                     <p><strong>Walls:</strong> Crashing into the outer walls or any player's trail will eliminate you.</p>
-                     <p><strong>Shooting:</strong> Each player gets <strong>2 shots</strong> per round. A successful hit on another player's head eliminates them instantly. Projectiles also carve a path through existing trails.</p>
+                     <p><strong>Shooting:</strong> Each player gets a limited number of shots per round. A successful hit on another player's head eliminates them instantly. Projectiles also carve a path through existing trails.</p>
                     <p><strong>Booster Pads:</strong> These glowing pads will give you a strong, sharp push. Use them for quick maneuvers or to dodge danger! (Can be disabled in the menu)</p>
 
                     <h3>Power-ups</h3>
@@ -122,6 +168,18 @@
                 </div>
             </div>
         </div>
+
+        <!-- Reset Confirmation Modal -->
+        <div id="reset-confirm-overlay" class="overlay hidden">
+            <div class="menu-box">
+                <h2>Reset All Settings?</h2>
+                <p class="subtitle" style="color: var(--secondary-text); line-height: 1.5;">This will restore all game options and player customizations to their original defaults. This action cannot be undone.</p>
+                <div class="button-group">
+                    <button id="confirm-reset-btn" class="action-btn">Yes, Reset Everything</button>
+                    <button id="cancel-reset-btn" class="secondary-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
         
         <!-- Countdown Timer -->
         <div id="countdown-overlay" class="overlay hidden">
@@ -137,7 +195,7 @@
             <div id="scoreboard"></div>
          </div>
     </div>
-    <script type="module" src="index.tsx"></script>
+    <script type="module" src="src/index.tsx"></script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>
