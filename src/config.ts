@@ -107,7 +107,7 @@ export const DEFAULT_CONFIG = {
     TURN_SPEED: 3.6, // radians per second
     PROJECTILE_SPEED: 240,
     SPAWN_SELECTION_DURATION: 5000,
-    SPAWN_PROTECTION_DURATION: 3000,
+    SPAWN_PROTECTION_DURATION: 5000,
     FIRE_COOLDOWN: 1000,
     
     // Trail Gaps (distance based)
