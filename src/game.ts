@@ -230,7 +230,8 @@ export class Game {
             return;
         }
         
-        this.roundStartTime = performance.now();
+                this.roundStartTime = performance.now();
+        this.lastPowerUpTime = performance.now() - (activeConfig.POWERUP_SPAWN_INTERVAL - 8000);
         this.roundDuration = 0;
         this.roundNumber++;
         this.gameState = 'spawnSelection';

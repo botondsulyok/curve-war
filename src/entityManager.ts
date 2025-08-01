@@ -52,7 +52,7 @@ export class EntityManager {
         this.projectiles = [];
         this.eliminationOrder = [];
         this.spatialGrid.clear();
-        this.game.lastPowerUpTime = performance.now();
+        
     }
 
     addTrailPointToGrid(point: TimedPoint, owner: Player) {
