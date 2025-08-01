@@ -148,7 +148,7 @@ export class Player {
             }
         }
         
-        if (this.isDrawing && !this.isGhost) {
+        if (this.isDrawing) {
            const currentSegment = this.trailSegments[this.trailSegments.length-1];
            if (currentSegment) {
                const newPoint: TimedPoint = { x: this.x, y: this.y, time: performance.now() };
